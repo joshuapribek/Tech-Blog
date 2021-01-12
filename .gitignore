@@ -1,4 +1,6 @@
-Assets
-HomeworkINS.md
 node_modules
 .env
+.DS_Store
+Assets
+
+HomeworkINS.md
