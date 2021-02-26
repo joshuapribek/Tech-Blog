@@ -1,100 +1,62 @@
-const router = require("express").Router();
-const { Comment, User, Blog } = require("../models");
-const withAuth = require("../utils/auth");
+const router = require('express').Router();
+const { Post, Comment, User } = require('../models/');
 
-// GET all blogs
-router.get("/", async (req, res) => {
+// get all posts for homepage
+router.get('/', async (req, res) => {
   try {
-    // find all blogs with associated comments AND usernames attributed to those comments
-    await Blog.findAll({ include: [{ all: true, nested: true }] }).then(
-      (dbPostData) => {
-        const blogs = dbPostData.map((blog) => blog.get({ plain: true }));
-        res.render("homepage", {
-          blogs,
-          logged_in: req.session.logged_in,
-        });
-      }
-    );
+    const postData = await Post.findAll({
+      include: [User],
+    });
+
+    const posts = postData.map((post) => post.get({ plain: true }));
+
+    res.render('all-posts', { posts });
   } catch (err) {
-    console.log(err);
     res.status(500).json(err);
   }
 });
 
-// GET one blog
-router.get("/blog/:id", async (req, res) => {
+// get single post
+router.get('/post/:id', async (req, res) => {
   try {
-    await Blog.findByPk(req.params.id, {
+    const postData = await Post.findByPk(req.params.id, {
       include: [
+        User,
         {
           model: Comment,
-          attributes: ["id", "content", "blog_id", "user_id", "date_created"],
-          include: {
-            model: User,
-            attributes: ["name"],
-          },
-        },
-        {
-          model: User,
-          attributes: ["name"],
+          include: [User],
         },
       ],
-    }).then((dbBlogData) => {
-      if (!dbBlogData) {
-        res.status(404).json({ message: "No blog post found with this ID" });
-        return;
-      }
-      // serialize data
-      const blog = dbBlogData.get({ plain: true });
-
-      // pass data to views
-      res.render("blog-post", {
-        blog,
-        logged_in: req.session.logged_in,
-      });
     });
+
+    if (postData) {
+      const post = postData.get({ plain: true });
+
+      res.render('single-post', { post });
+    } else {
+      res.status(404).end();
+    }
   } catch (err) {
-    console.log(err);
     res.status(500).json(err);
   }
 });
 
-// GET dashboard and FIND all blogs that belong to User
-// Use withAuth middleware to prevent access to route
-router.get("/dashboard", withAuth, async (req, res) => {
-  try {
-    const user = await User.findByPk(req.session.user_id);
-
-    // Find the logged in user based on the session ID
-    const blogData = await Blog.findAll({ where: { user_id: req.session.user_id }} , {
-      // attributes: { exclude: ["password"] },
-      include: [{ model: User }],
-    });
-
-    // map the result of blogData
-    const blogs = blogData.map(blog => blog.get({ plain: true }));
-
-    // send blogs and user.dataValues to render
-    res.render("dashboard", {
-      blogs,
-      ...user.dataValues,
-      logged_in: true,
-    });
-  } catch (err) {
-    console.log(err);
-    res.status(500).json(err);
-  }
-});
-
-router.get("/login", (req, res) => {
-  // If the user is already logged in, redirect the request to another route
-  if (req.session.logged_in) {
-    res.redirect("/");
-    console.log("User is already logged in");
+router.get('/login', (req, res) => {
+  if (req.session.loggedIn) {
+    res.redirect('/');
     return;
   }
 
-  res.render("login");
+  res.render('login');
+});
+
+router.get('/signup', (req, res) => {
+  if (req.session.loggedIn) {
+    res.redirect('/');
+    return;
+  }
+
+  res.render('signup');
 });
 
 module.exports = router;
